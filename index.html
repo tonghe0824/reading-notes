@@ -280,6 +280,8 @@
     }
 
     function deleteReflection(bookId, entryId, refId){
+      // 增加确认提示，行为与删除书目/摘录一致
+      if(!confirm('确要删除？')) return;
       const books = loadBooks(); const book = books.find(b => b.id === bookId); if(!book) return;
       const entry = book.entries.find(e => e.id === entryId); if(!entry) return;
       entry.reflections = entry.reflections.filter(r => r.id !== refId);
