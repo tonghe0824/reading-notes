@@ -29,10 +29,11 @@
     form.card-form.accent{background:var(--accent); color:#fff;}
     form.card-form.accent label{color:#fff;}
     .btn-primary{background:var(--accent-dark);color:#fff;border:none;padding:10px 14px;border-radius:10px;font-weight:700;}
+    .btn-secondary{background:transparent;border:1px solid #d1d5db;color:#6b7280;padding:8px 12px;border-radius:8px;font-weight:600;}
     form.card-form.accent input[type="text"], form.card-form.accent textarea{background:var(--input-user-bg);color:#072431;border:1px solid rgba(0,0,0,0.08);}
     .form-row{display:grid;gap:8px;position:relative;}
     label{font-size:0.95rem;color:#374151;font-weight:600;}
-    input[type="text"], textarea{font-family:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid #e6e5e2;background:#fff;resize:vertical;outline:none;-webkit-appearance:none;appearance: none;}
+    input[type="text"], textarea{font-family:inherit;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid #e6e5e2;background:#fff;resize:vertical;outline:none;-webkit-appearance:none;-moz-appearance:none;appearance:none;}
     textarea{min-height:84px;}
     .actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;}
     button{cursor:pointer;min-height:var(--touch-target-min);-webkit-tap-highlight-color:transparent;}
@@ -73,12 +74,20 @@
     .excerpt-group{background:var(--input-user-bg);padding:12px;border-radius:12px;border:1px solid rgba(0,0,0,0.06);position:relative;}
     .excerpt-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
     .excerpt-text{font-weight:600;color:#111827;white-space:pre-wrap;margin:0;}
-    .group-actions{margin-left:8px;display:flex;align-items:flex-start;}
+    /* 将操作按钮竖排（加号在上，删除在下） */
+    .group-actions{margin-left:8px;display:flex;flex-direction:column;align-items:center;gap:8px;}
     .reflections{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
     .reflection-item{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;background:var(--input-user-bg);padding:10px;border-radius:8px;border:1px solid rgba(0,0,0,0.06);}
     .reflection-left{font-size:0.95rem;color:#111827;white-space:pre-wrap;}
-    .reflection-meta{font-size:0.82rem;color:#6b7280;text-align:right;}
+    /* 时间与内容左对齐（用户要求） */
+    .reflection-meta{font-size:0.82rem;color:#6b7280;text-align:left;margin-top:6px;}
     .reflection-actions{display:flex;gap:8px;align-items:center;}
+
+    /* 内联感想表单样式：与用户要求保持背景 #F7F7E0 */
+    .inline-reflection{ margin-top:10px; display:flex; gap:8px; align-items:flex-end; background:#F7F7E0; padding:10px; border-radius:8px; }
+    .inline-reflection textarea{ flex:1; min-height:56px; border-radius:8px; padding:8px; font-size:15px; border:1px solid rgba(0,0,0,0.08); background:#F7F7E0; color:#072431; }
+    /* 将“弃稿”样式与“保存”一致（背景与字体） */
+    .inline-reflection .btn-primary, .inline-reflection .btn-ghost{ padding:8px 10px; border-radius:8px; min-height:36px; background:var(--accent-dark); color:#fff; border:none; }
 
     .add-toggle-wrap{margin-top:18px;display:flex;justify-content:center;}
     .toggle-add-btn{background:var(--accent);border:none;color:#fff;font-size:1rem;padding:10px 20px;border-radius:40px;cursor:pointer;font-weight:600;box-shadow:0 6px 14px rgba(0,0,0,0.06);min-height:var(--touch-target-min);}
@@ -89,6 +98,9 @@
     .inline-user-area .btn-primary, .inline-user-area .btn-ghost, .inline-user-area .toggle-inline-btn, .toggle-inline-btn{background:var(--accent-dark);color:#fff;border:none;}
     .toggle-inline-btn{padding:8px 10px;border-radius:8px;font-weight:700;cursor:pointer;}
     .toggle-inline-btn:hover,.inline-user-area .btn-primary:hover{opacity:0.95;}
+
+    .data-actions{margin-top:18px;display:flex;gap:8px;justify-content:center;align-items:center;}
+    .data-actions .btn-secondary{border-color:#e5e7eb;color:#6b7280;background:transparent;}
 
     button,input,textarea{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
     input,textarea{border-radius:10px}
@@ -151,6 +163,13 @@
         <button type="submit" class="btn-primary">收讫</button>
       </div>
     </form>
+
+    <!-- 数据导入导出区域 -->
+    <div class="data-actions" aria-hidden="false">
+      <button id="exportBtn" class="btn-secondary" type="button">导出数据</button>
+      <button id="importBtn" class="btn-secondary" type="button">导入数据</button>
+      <input id="importFile" type="file" accept=".json,application/json" style="display:none" />
+    </div>
   </div>
 
   <div id="modalRoot" aria-hidden="true"></div>
@@ -217,6 +236,47 @@
       }
       saveBooks(books);
       renderBooksList();
+    }
+
+    // 新增：向指定摘录项添加感悟并保存
+    function addReflectionToEntry(bookId, entryId, text){
+      if(!text || !text.trim()) return;
+      const books = loadBooks();
+      const book = books.find(b => b.id === bookId);
+      if(!book) return;
+      const entry = book.entries.find(e => e.id === entryId);
+      if(!entry) return;
+      entry.reflections = entry.reflections || [];
+      entry.reflections.push({ id: genId('ref'), text: text.trim(), createdAt: Date.now() });
+      saveBooks(books);
+      renderBooksList();
+      renderBookModal(bookId);
+    }
+
+    // 新增：构建内联添加感想表单（占位符“缀余墨”）
+    function buildReflectionInline(bookId, entryId){
+      const wrap = document.createElement('div');
+      wrap.className = 'inline-reflection';
+      const ta = document.createElement('textarea');
+      ta.placeholder = '缀余墨';
+      const btnCancel = document.createElement('button');
+      btnCancel.type = 'button';
+      btnCancel.className = 'btn-ghost';
+      btnCancel.textContent = '弃稿';
+      const btnSave = document.createElement('button');
+      btnSave.type = 'button';
+      btnSave.className = 'btn-primary';
+      btnSave.textContent = '保存';
+      btnSave.addEventListener('click', ()=>{
+        const v = ta.value.trim();
+        if(!v){ alert('请输入感想内容'); ta.focus(); return; }
+        addReflectionToEntry(bookId, entryId, v);
+      });
+      btnCancel.addEventListener('click', ()=> { if(wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap); });
+      wrap.appendChild(ta);
+      wrap.appendChild(btnCancel);
+      wrap.appendChild(btnSave);
+      return wrap;
     }
 
     function deleteReflection(bookId, entryId, refId){
@@ -382,6 +442,10 @@
       document.getElementById('title').focus();
     });
 
+    // SVG helpers
+    function svgTrashAccent(){ return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="#79A3CE"><path d="M5.5 5.5A.5.5 0 0 1 6 5h4a.5.5 0 0 1 .5.5V6h1V5.5A1.5 1.5 0 0 0 10 4h-4A1.5 1.5 0 0 0 4.5 5.5V6h1v-.5z"/><path d="M14.5 6a.5.5 0 0 1 .5.5v.5H1v-.5A.5.5 0 0 1 1.5 6h13zM3 7h10v7.5A1.5 1.5 0 0 1 11.5 16h-7A1.5 1.5 0 0 1 3 14.5V7z"/></g></svg>`; }
+    function svgPlusAccent(){ return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><g fill="#79A3CE"><path d="M8 3.5a.5.5 0 0 1 .5.5v3.5H12a.5.5 0 0 1 0 1H8.5V12a.5.5 0 0 1-1 0V8.5H4a.5.5 0 0 1 0-1h3.5V4a.5.5 0 0 1 .5-.5z"/></g></svg>`; }
+
     function renderBooksList(){
       const container = document.getElementById('booksList'); container.innerHTML = '';
       const books = loadBooks().slice().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
@@ -460,7 +524,7 @@
 
       const sub = document.createElement('div'); sub.className='modal-sub'; sub.textContent = `始记之时：${formatTime(book.createdAt || Date.now())} · 摘录篇数：${(book.entries||[]).length}`;
 
-      // NEW: show author and nationality on same line like "赵南柱 · 韩国"
+      // 作者·国籍同行显示
       let authorLine = '';
       if(book.author && book.author.trim()){
         authorLine = book.author.trim();
@@ -474,7 +538,6 @@
       left.appendChild(sub);
       left.appendChild(authorLineEl);
 
-      // keep aboutAuthor and summary below
       if(book.aboutAuthor && book.aboutAuthor.trim()){
         const aboutEl = document.createElement('div'); aboutEl.className='small-muted'; aboutEl.textContent = book.aboutAuthor;
         left.appendChild(aboutEl);
@@ -523,8 +586,32 @@
           const headerRow = document.createElement('div'); headerRow.className='excerpt-header';
           const excerptText = document.createElement('div'); excerptText.className='excerpt-text'; excerptText.innerHTML = escapeHtml(en.excerpt || '');
           const groupActions = document.createElement('div'); groupActions.className='group-actions';
-          const delGroupBtn = document.createElement('button'); delGroupBtn.className='icon-btn'; delGroupBtn.title='删除该摘录组'; delGroupBtn.innerHTML = svgTrashAccent(); delGroupBtn.addEventListener('click', (evt)=>{ evt.stopPropagation(); deleteExcerptGroup(bookId, en.id); });
+
+          // 加号图标（与删除图标样式一致：使用 svgPlusAccent 且类名 icon-btn）
+          const addRefBtn = document.createElement('button');
+          addRefBtn.className = 'icon-btn';
+          addRefBtn.type = 'button';
+          addRefBtn.title = '添加感想';
+          addRefBtn.innerHTML = svgPlusAccent();
+          addRefBtn.addEventListener('click', (evt)=>{
+            evt.stopPropagation();
+            const existing = grp.querySelector('.inline-reflection');
+            if(existing){ existing.parentNode.removeChild(existing); return; }
+            const inline = buildReflectionInline(book.id, en.id);
+            const existingRefWrap = grp.querySelector('.reflections');
+            if(existingRefWrap) grp.insertBefore(inline, existingRefWrap);
+            else grp.appendChild(inline);
+            const ta = inline.querySelector('textarea');
+            if(ta) ta.focus();
+          });
+
+          // 删除图标（与已有实现一致）
+          const delGroupBtn = document.createElement('button'); delGroupBtn.className='icon-btn'; delGroupBtn.title='删除该摘录组'; delGroupBtn.innerHTML = svgTrashAccent();
+          delGroupBtn.addEventListener('click', (evt)=>{ evt.stopPropagation(); deleteExcerptGroup(bookId, en.id); });
+
+          groupActions.appendChild(addRefBtn);
           groupActions.appendChild(delGroupBtn);
+
           headerRow.appendChild(excerptText); headerRow.appendChild(groupActions);
           grp.appendChild(headerRow);
 
@@ -568,12 +655,10 @@
       row2.appendChild(row2Inner);
 
       const row3 = document.createElement('div'); row3.className='form-row'; const labelAbout = document.createElement('label'); labelAbout.textContent='纸上故人';
-      const ao1 = document.createElement('textarea'); ao1.required=true; ao1.placeholder='生平略述'; 
       const inputAbout = document.createElement('input'); inputAbout.type='text'; inputAbout.value = book.aboutAuthor || '';
       row3.appendChild(labelAbout); row3.appendChild(inputAbout);
 
-      const row4 = document.createElement('div'); row4.className='form-row'; const labelSummary = document.createElement('label'); labelSummary.textContent='一语荐'; 
-      const ao2 = document.createElement('textarea'); ao2.required=true; ao2.placeholder='一语荐书';
+      const row4 = document.createElement('div'); row4.className='form-row'; const labelSummary = document.createElement('label'); labelSummary.textContent='一语荐';
       const inputSummary = document.createElement('input'); inputSummary.type='text'; inputSummary.value = book.summary || '';
       row4.appendChild(labelSummary); row4.appendChild(inputSummary);
 
@@ -645,10 +730,81 @@
       return container;
     }
 
-    function svgTrashAccent(){ return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#79A3CE" aria-hidden="true"><path d="M5.5 5.5A.5.5 0 0 1 6 5h4a.5.5 0 0 1 .5.5V6h1V5.5A1.5 1.5 0 0 0 10 4h-4A1.5 1.5 0 0 0 4.5 5.5V6h1v-.5z"/><path d="M14.5 6a.5.5 0 0 1 .5.5v.5H1v-.5A.5.5 0 0 1 1.5 6h13zM3 7h10v7.5A1.5 1.5 0 0 1 11.5 16h-7A1.5 1.5 0 0 1 3 14.5V7z"/></svg>`; }
+    // ------------- 新增：导出与导入功能 -------------
+    function exportNotesAsFile(filename = 'notes_backup.json'){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY) || '[]';
+        // try to pretty-print JSON
+        let pretty = raw;
+        try { const parsed = JSON.parse(raw); pretty = JSON.stringify(parsed, null, 2); } catch(e) { /* leave raw */ }
+        const blob = new Blob([pretty], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch(err){
+        alert('导出失败：' + (err && err.message ? err.message : String(err)));
+      }
+    }
 
-    document.addEventListener('DOMContentLoaded', ()=> { renderBooksList(); });
+    function importNotesFromFile(file){
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e){
+        try{
+          const text = e.target.result;
+          const parsed = JSON.parse(text);
+          // Basic validation: should be array or object
+          if(typeof parsed !== 'object' || parsed === null){ alert('文件格式不正确'); return; }
+          if(!confirm('启封旧箧将覆盖当前笔记，确认继续？')) return;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+          // Refresh UI
+          renderBooksList();
+          // Close any open modal
+          closeModal();
+          alert('导入并替换完成。');
+        } catch(err){
+          alert('导入失败：文件不是有效的 JSON 或解析出错。');
+          console.error(err);
+        }
+      };
+      reader.onerror = function(){
+        alert('读取文件失败。');
+      };
+      reader.readAsText(file, 'utf-8');
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      renderBooksList();
+
+      // export/import button wiring
+      const exportBtn = document.getElementById('exportBtn');
+      const importBtn = document.getElementById('importBtn');
+      const importFile = document.getElementById('importFile');
+
+      exportBtn.addEventListener('click', ()=>{
+        // filename notes_backup.json as requested
+        exportNotesAsFile('notes_backup.json');
+      });
+
+      importBtn.addEventListener('click', ()=>{
+        importFile.value = '';
+        importFile.click();
+      });
+
+      importFile.addEventListener('change', (e)=>{
+        const f = e.target.files && e.target.files[0];
+        if(!f) return;
+        importNotesFromFile(f);
+      });
+    });
+
     window.addEventListener('storage', (e)=> { if(e.key === STORAGE_KEY) renderBooksList(); });
+    // ------------- 结束新增代码 -------------
   </script>
 </body>
 </html>
