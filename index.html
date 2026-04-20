@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>读书笔记</title>
+  <style>
+    /* 全局风格 */
+    :root{
+      --bg: #f9f6ef;
+      --card: #ffffff;
+      --radius: 16px;
+      --shadow: 0 6px 18px rgba(20,20,20,0.06);
+      --accent: #2b6cb0;
+    }
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft Yahei', sans-serif;
+      background:var(--bg);
+      color:#1f2937;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* 布局 */
+    .wrap{
+      max-width:900px;
+      margin:32px auto;
+      padding:24px;
+    }
+
+    header{
+      margin-bottom:18px;
+    }
+    h1{
+      margin:0 0 6px 0;
+      font-size:1.6rem;
+      font-weight:700; /* 标题加粗 */
+    }
+    p.lead{
+      margin:0;
+      color:#4b5563;
+      font-size:0.95rem;
+    }
+
+    /* 表单风格 */
+    form.card-form{
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:18px;
+      margin-top:16px;
+      display:grid;
+      gap:12px;
+    }
+    .form-row{
+      display:grid;
+      gap:8px;
+    }
+    label{
+      font-size:0.9rem;
+      color:#374151;
+      font-weight:600;
+    }
+    input[type="text"], textarea{
+      font-family:inherit;
+      font-size:0.95rem;
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid #e6e5e2;
+      background: #fff;
+      resize:vertical;
+      min-height:40px;
+      outline:none;
+    }
+    textarea{ min-height:80px; }
+
+    .actions{
+      display:flex;
+      gap:8px;
+      justify-content:flex-end;
+      align-items:center;
+    }
+    button{
+      cursor:pointer;
+      border: none;
+      padding:10px 14px;
+      border-radius:10px;
+      font-weight:600;
+    }
+    .btn-primary{
+      background:var(--accent);
+      color:#fff;
+    }
+    .btn-ghost{
+      background:transparent;
+      color:#374151;
+      border:1px solid #e6e5e2;
+    }
+
+    /* 笔记列表 */
+    .notes-grid{
+      margin-top:22px;
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap:16px;
+    }
+    .note-card{
+      background:var(--card);
+      border-radius:var(--radius);
+      padding:14px;
+      box-shadow:var(--shadow);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .note-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .note-title{
+      font-weight:700;
+      font-size:1rem;
+      margin:0;
+      word-break:break-word;
+    }
+    .note-meta{
+      font-size:0.82rem;
+      color:#6b7280;
+    }
+    .note-body{
+      font-size:0.95rem;
+      color:#111827;
+      white-space:pre-wrap; /* 保持换行 */
+    }
+    .note-footer{
+      margin-top:auto;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+    }
+    .delete-btn{
+      background:#fff5f5;
+      color:#b91c1c;
+      border:1px solid #fee2e2;
+      padding:8px 10px;
+      border-radius:10px;
+      font-weight:700;
+    }
+
+    /* 响应细节 */
+    @media (max-width:420px){
+      .wrap{ padding:14px; margin:16px; }
+      .note-footer{ flex-direction:column; align-items:flex-start; gap:6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>读书笔记</h1>
+      <p class="lead">记录书名、摘录与感悟。笔记保存在浏览器，本地持久化；按添加时间倒序显示。</p>
+    </header>
+
+    <!-- 添加笔记表单 -->
+    <form id="noteForm" class="card-form" autocomplete="off">
+      <div class="form-row">
+        <label for="title">书名</label>
+        <input id="title" name="title" type="text" placeholder="例如：《活着》" required />
+      </div>
+
+      <div class="form-row">
+        <label for="excerpt">摘录内容</label>
+        <textarea id="excerpt" name="excerpt" placeholder="粘贴或输入你想保留的摘录..." required></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="reflection">我的感悟（选填）</label>
+        <textarea id="reflection" name="reflection" placeholder="写下你的思考与感想..."></textarea>
+      </div>
+
+      <div class="actions">
+        <button type="reset" class="btn-ghost">清空</button>
+        <button type="submit" class="btn-primary">添加笔记</button>
+      </div>
+    </form>
+
+    <!-- 列表 -->
+    <section id="notesList" class="notes-grid" aria-live="polite" aria-label="笔记列表">
+      <!-- 笔记卡片由 JS 渲染 -->
+    </section>
+  </div>
+
+  <script>
+    // 本地存储的键名
+    const STORAGE_KEY = 'reading-notes-v1';
+
+    // 获取保存的笔记数组（返回空数组而不是 null）
+    function loadNotes() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        return JSON.parse(raw);
+      } catch (e) {
+        console.error('读取本地笔记失败', e);
+        return [];
+      }
+    }
+
+    // 将笔记数组保存到 localStorage
+    function saveNotes(notes) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+      } catch (e) {
+        console.error('保存本地笔记失败', e);
+      }
+    }
+
+    // 格式化时间显示，例如：2026-04-20 15:03
+    function formatTime(ts) {
+      const d = new Date(ts);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    // 渲染所有笔记（按时间倒序）
+    function renderNotes() {
+      const container = document.getElementById('notesList');
+      container.innerHTML = '';
+
+      let notes = loadNotes();
+      // 按添加时间倒序排列（最新在前）
+      notes.sort((a,b) => b.createdAt - a.createdAt);
+
+      if (notes.length === 0) {
+        // 显示占位提示
+        const empty = document.createElement('div');
+        empty.style.gridColumn = '1 / -1';
+        empty.style.textAlign = 'center';
+        empty.style.color = '#6b7280';
+        empty.textContent = '还没有笔记，试试添加一条吧。';
+        container.appendChild(empty);
+        return;
+      }
+
+      // 为每条笔记创建卡片
+      for (const note of notes) {
+        const card = document.createElement('article');
+        card.className = 'note-card';
+        card.setAttribute('data-id', note.id);
+
+        // 头部：书名 + 时间
+        const header = document.createElement('div');
+        header.className = 'note-header';
+        const title = document.createElement('h3');
+        title.className = 'note-title';
+        title.textContent = note.title || '（无书名）';
+        const meta = document.createElement('div');
+        meta.className = 'note-meta';
+        meta.textContent = formatTime(note.createdAt);
+
+        header.appendChild(title);
+        header.appendChild(meta);
+
+        // 主体：摘录与感悟
+        const excerpt = document.createElement('div');
+        excerpt.className = 'note-body';
+        excerpt.innerHTML = `<strong>摘录：</strong>\n${escapeHtml(note.excerpt)}`;
+
+        const reflection = document.createElement('div');
+        reflection.className = 'note-body';
+        reflection.innerHTML = `<strong>感悟：</strong>\n${note.reflection ? escapeHtml(note.reflection) : '<span style="color:#6b7280;">（无）</span>'}`;
+
+        // 底部：删除按钮
+        const footer = document.createElement('div');
+        footer.className = 'note-footer';
+
+        const idSpan = document.createElement('div');
+        idSpan.className = 'note-meta';
+        idSpan.textContent = ''; // 可用于扩展（如标签）
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.type = 'button';
+        delBtn.textContent = '删除';
+        delBtn.addEventListener('click', () => deleteNote(note.id));
+
+        footer.appendChild(idSpan);
+        footer.appendChild(delBtn);
+
+        // 组合
+        card.appendChild(header);
+        card.appendChild(excerpt);
+        card.appendChild(reflection);
+        card.appendChild(footer);
+
+        container.appendChild(card);
+      }
+    }
+
+    // 简单的文本转义以防止 XSS（因为 innerHTML 用于换行展示）
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/\n/g, '<br/>');
+    }
+
+    // 添加一条笔记
+    function addNote(note) {
+      const notes = loadNotes();
+      notes.push(note);
+      saveNotes(notes);
+      renderNotes();
+    }
+
+    // 删除笔记（根据 id）
+    function deleteNote(id) {
+      let notes = loadNotes();
+      notes = notes.filter(n => n.id !== id);
+      saveNotes(notes);
+      renderNotes();
+    }
+
+    // 处理表单提交
+    document.getElementById('noteForm').addEventListener('submit', function(e){
+      e.preventDefault();
+      const title = document.getElementById('title').value.trim();
+      const excerpt = document.getElementById('excerpt').value.trim();
+      const reflection = document.getElementById('reflection').value.trim();
+
+      // 简单校验：书名与摘录为必填
+      if (!title) {
+        alert('请输入书名。');
+        return;
+      }
+      if (!excerpt) {
+        alert('请输入摘录内容。');
+        return;
+      }
+
+      const note = {
+        id: 'note-' + Date.now() + '-' + Math.random().toString(36).slice(2,8), // 唯一 id
+        title,
+        excerpt,
+        reflection,
+        createdAt: Date.now()
+      };
+
+      addNote(note);
+
+      // 重置并聚焦书名输入
+      this.reset();
+      document.getElementById('title').focus();
+    });
+
+    // 初始化渲染
+    document.addEventListener('DOMContentLoaded', () => {
+      renderNotes();
+    });
+
+    // 对于开发者：在控制台可用的轻量方法（非必须）
+    // window.__readingNotes = { loadNotes, saveNotes, renderNotes, deleteNote };
+  </script>
+</body>
+</html>
