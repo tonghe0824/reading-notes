@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>读书笔记（可编辑）</title>
+  <title>读书笔记</title>
   <style>
     :root{
       --bg:#F7F7E0;
@@ -266,7 +266,7 @@
       const btnSave = document.createElement('button');
       btnSave.type = 'button';
       btnSave.className = 'btn-primary';
-      btnSave.textContent = '保存';
+      btnSave.textContent = '收讫';
       btnSave.addEventListener('click', ()=>{
         const v = ta.value.trim();
         if(!v){ alert('请输入感想内容'); ta.focus(); return; }
@@ -284,8 +284,8 @@
       if(!confirm('确要删除？')) return;
       const books = loadBooks(); const book = books.find(b => b.id === bookId); if(!book) return;
       const entry = book.entries.find(e => e.id === entryId); if(!entry) return;
+      // 仅删除所选感悟，不再删除整个摘录项
       entry.reflections = entry.reflections.filter(r => r.id !== refId);
-      if(entry.reflections.length === 0) book.entries = book.entries.filter(e => e.id !== entryId);
       saveBooks(books); renderBooksList(); renderBookModal(bookId);
     }
     function deleteExcerptGroup(bookId, entryId){
@@ -434,6 +434,8 @@
         }
       }
       addExcerptToBook(bookRef.id, excerptVal, reflectionVal, { author: authorVal, nationality: nationalityVal, aboutAuthor: aboutVal, summary: summaryVal });
+      // 如果当前打开的模态为该书，立即更新模态内容
+      if(document.querySelector('.modal[data-book-id="' + bookRef.id + '"]')){ renderBookModal(bookRef.id); }
       document.getElementById('title').value = '';
       document.getElementById('author').value = '';
       document.getElementById('nationality').value = '';
@@ -722,6 +724,8 @@
         const ex = ta1.value.trim(); const rf = ta2.value.trim();
         if(!ex){ alert('请输入摘录内容'); ta1.focus(); return; }
         addExcerptToBook(bookId, ex, rf);
+        // 立即刷新模态内容以反映新增的摘录与感想
+        if(document.querySelector('.modal[data-book-id="' + bookId + '"]')){ renderBookModal(bookId); }
         if(container && container.parentNode) container.parentNode.removeChild(container);
         if(typeof onClose === 'function') onClose();
       });
